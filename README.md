@@ -1,17 +1,16 @@
 # reCAPTCHA v2 Audio Solver
 
-An experimental **reCAPTCHA v2 checkbox/audio solver** for authorized testing. The audio solver
-uses a Chrome/Chromium browser and Google speech recognition. The image solver
-uses Playwright and a local vision model.
+An experimental **reCAPTCHA v2 checkbox/audio solver** for authorized testing.
+It uses a Chrome/Chromium browser and Google speech recognition.
 
 This project is not a reCAPTCHA v3 score solver, hCaptcha solver, or Cloudflare
 Turnstile solver. Enterprise audio paths are allowlisted, but Enterprise solving
 has not been verified.
 
-**Start with the audio demo.** It has a runnable entry point and does not need
-LM Studio. Neither implementation can guarantee acceptance by a live CAPTCHA
-provider. A transcription test, a checkbox pass, and a solved audio challenge
-are different results; this project reports them separately.
+**Start with the audio demo.** It has a runnable entry point. Acceptance by a
+live CAPTCHA provider is not guaranteed. A transcription test, a checkbox pass,
+and a solved audio challenge are different results; this project reports them
+separately.
 
 ## Quick navigation
 
@@ -19,7 +18,6 @@ are different results; this project reports them separately.
 - [Install](#install)
 - [Run the audio demo](#run-the-audio-demo)
 - [Use the audio class in your own code](#use-the-audio-class-in-your-own-code)
-- [Run the image experiment](#run-the-image-experiment)
 - [How the code works](#how-the-code-works)
 - [Tests](#tests)
 - [Troubleshooting](#troubleshooting)
@@ -43,26 +41,22 @@ limitations, and the distinction between mocked, synthetic, and live results.
 | Audio conversion and real Google transcription | Generated speech transcribed correctly |
 | Live browser checkbox/token flow | Repeated live attempts; outcomes recorded separately |
 | Real audio challenge accepted by the provider | See validation record; do not infer from checkbox-only success |
-| Image coordinates, capture and JSON handling | Unit tests and local browser fixture |
-| Real vision-model solving accuracy | Not established; local model service was unavailable |
 
 This is experimental software, not a production service or a promise of a
 particular success rate. The audio demo checks the widget and token presence;
 it does not submit arbitrary website forms or perform your application's
 server-side token verification.
 
-## Choose an implementation
+## Repository map
 
-| | Audio | Image |
-| --- | --- | --- |
-| Entry point | `audio-solver/demo.py` | `standalone/captchasolver.py` |
-| Core implementation | `audio-solver/RecaptchaSolver.py` | Same file as entry point |
-| Browser library | DrissionPage | Playwright |
-| Browser install | System Chrome or Chromium | Playwright Chromium |
-| Recognition | Google speech recognition | Local OpenAI-compatible vision endpoint |
-| Extra prerequisite | FFmpeg | Running vision model with image support |
-| Challenge scope | v2 checkbox and audio flow | 4×4 image grids; skips/reloads 3×3 grids |
-| Browser ownership | Demo creates one; class accepts caller's browser | Script creates its own browser |
+| File | Purpose |
+| --- | --- |
+| `audio-solver/demo.py` | One-shot command-line demo with safe result output |
+| `audio-solver/RecaptchaSolver.py` | Reusable solver, secure audio download and transcription |
+| `tests/test_audio_security.py` | Offline security, timeout and error-handling regressions |
+| `requirements.txt` | Three direct Python dependencies |
+| `requirements-tested.txt` | Tested dependency version constraints |
+| `docs/VALIDATION.md` | Recorded test results and limitations |
 
 ## Install
 
@@ -80,7 +74,7 @@ python -m pip check
 
 On Windows PowerShell, activate with `.venv\Scripts\Activate.ps1` instead.
 
-`requirements.txt` lists the six direct dependencies.
+`requirements.txt` lists the three direct dependencies.
 `requirements-tested.txt` records exact versions from the tested environment,
 including transitive dependencies. It is a constraints snapshot, not proof of
 compatibility with every Python version or operating system. The recorded run
@@ -92,13 +86,10 @@ Install the native prerequisites:
    installation is sufficient; pass `--browser-path` if detection fails.
 2. **FFmpeg:** install with your operating system's package manager, and ensure
    both commands below are available to the same shell as Python.
-3. **Playwright Chromium:** install only if running the image script or its
-   browser fixture.
 
 ```sh
 ffmpeg -version
 ffprobe -version
-python -m playwright install chromium
 ```
 
 The audio implementation does not record your microphone. It downloads the
@@ -210,62 +201,7 @@ anchor selection, but challenge discovery and token lookup are page-wide.
 Multi-widget association is not guaranteed; start with a page containing one
 widget. The class does not own or close the browser you provide.
 
-## Run the image experiment
-
-First start a local vision service that implements the OpenAI-style chat
-completions API **and accepts images**. The defaults in
-`standalone/captchasolver.py` are:
-
-| Setting | Default / purpose |
-| --- | --- |
-| `LM_STUDIO_URL` | `http://127.0.0.1:1234/v1/chat/completions` |
-| `LM_MODEL` | `zai-org/glm-4.6v-flash`; must match the loaded model identifier |
-| `USE_LM_STUDIO` | `True` |
-| `TEST_URL` | Google's reCAPTCHA demo |
-| `NUM_RUNS` | `10`; reduce to `1` for your first check |
-| `MAX_SLOTS` | `5` successive grids per run |
-| `MAX_3x3_RETRIES` | `8` attempts to receive a 4×4 grid |
-| `HEADLESS` | `False` |
-| `LM_TIMEOUT` | `120` seconds per request; requests can be retried |
-| `RECHECK_THRESHOLD` | `0.55`; positive tiles below this are checked again |
-
-Edit those source constants intentionally before running. There is no `.env`
-loader and no command-line configuration interface for this script.
-
-```sh
-python -m playwright install chromium
-python standalone/captchasolver.py
-```
-
-A vision-capable model must already be loaded and the API server running.
-Installing Python dependencies does not install a model or start LM Studio.
-Setting `USE_LM_STUDIO=False` disables model HTTP calls, **but does not disable
-browser clicks**; it is not a passive screenshot-only mode.
-
-The model sees a clean full grid followed by separate tiles. Numbered overlays
-are debug artifacts and are not sent to the model. Only JSON Boolean `true`
-authorizes a tile selection; strings such as `"false"` are not treated as true.
-Invalid confidence values become zero so positive predictions are rechecked.
-
-Generated files are relative to the directory where you launch the script:
-
-```text
-captcha_solver_output/
-  full/            full-page screenshots
-  grid/            clean grid screenshots
-  overlay/         numbered debugging images
-  tiles/           individual tiles for each grid
-  reports/         per-run JSON reports
-  solver_runs.csv  summary rows
-```
-
-Typical run statuses include `SOLVED`, `PASSED_NO_CHALLENGE`, `NO_CHECKBOX`,
-`NO_4x4_AFTER_MAX_RETRIES`, `SLOT_FAILED`, `UNSOLVED`, `MAX_SLOTS`, and `CRASHED`.
-Consult the status and checkbox fields, not merely whether the script exited.
-
 ## How the code works
-
-### Audio path
 
 ```text
 caller browser
@@ -287,22 +223,6 @@ killed and reaped, temporary files are cleaned, and no answer is submitted.
 This is not a 15-second deadline for the whole solve: browser waits, DNS, media
 conversion, and download/header processing have separate behavior.
 
-### Image path
-
-```text
-Playwright demo page → checkbox → obtain 4×4 grid
-  → read target text → capture grid element → split into 16 tiles
-  → local model describes full grid
-  → local model classifies every tile
-  → recheck uncertain positives → click tile centers → Verify
-  → inspect checkbox/new grid → write CSV and JSON
-```
-
-Playwright element bounding boxes already use the main frame's viewport
-coordinates. Do not add the iframe offset a second time. Grid element screenshots
-handle frame offsets and scrolling directly. See the
-[Playwright locator documentation](https://playwright.dev/python/docs/api/class-locator#locator-bounding-box).
-
 ## Tests
 
 Offline unit and security regressions:
@@ -312,18 +232,9 @@ python -m unittest discover -s tests -v
 python -m pip check
 ```
 
-These tests do not contact Google or a model server. They cover URL rejection,
-DNS pinning, redirects, frame origins, worker termination, cleanup, model JSON,
-and image coordinates. Passing them does not prove a live CAPTCHA success rate.
-
-A separate opt-in local browser fixture verifies real iframe coordinates and
-image capture without any external page or model request:
-
-```sh
-python tests/browser_image_check.py
-# Or use an installed Chrome executable:
-python tests/browser_image_check.py --browser-path "/path/to/chrome"
-```
+These tests do not contact Google. They cover URL rejection, DNS pinning,
+redirects, frame origins, worker termination, temporary-file cleanup, and
+recognition error handling. Passing them does not prove a live CAPTCHA success rate.
 
 For a live check, run the audio demo once and record the JSON outcome. Keep
 headless and visible-browser results separate, as well as checkbox-only and
@@ -332,7 +243,7 @@ audio-challenge successes. Do not commit tokens, recordings or challenge URLs.
 For deterministic tests of your own application's CAPTCHA integration, Google
 provides [official test keys](https://developers.google.com/recaptcha/docs/faq).
 Those can avoid real challenges; they do not validate this solver's transcription
-or image-recognition ability.
+ability.
 
 ## Troubleshooting
 
@@ -341,7 +252,6 @@ or image-recognition ability.
 | `ModuleNotFoundError` | Activate the virtual environment; install with that environment's `python -m pip` |
 | Browser cannot start | Install Chrome/Chromium and pass its executable using `--browser-path` |
 | Browser address error after configuring options | `auto_port()` manages a temporary profile. Do not call `set_user_data_path()` after it; DrissionPage disables automatic port selection |
-| Playwright executable missing | Run `python -m playwright install chromium` in the same environment |
 | FFmpeg/FFprobe not found | Install both tools and check the shell's `PATH` |
 | `NotOpenSSLWarning` | The recorded system Python emitted a LibreSSL warning. A Python build linked against supported OpenSSL avoids that environment issue; rerun tests after changing Python |
 | `rate_limited`, “Try again later”, automated-query notice | Provider restriction. Stop; wait before a later manual test. Do not count it as a pass |
@@ -351,14 +261,11 @@ or image-recognition ability.
 | `Untrusted reCAPTCHA URL` | A frame/audio URL is outside the allowlist. Inspect the origin/path without logging query tokens; do not disable validation |
 | `Non-public reCAPTCHA address` | DNS resolved to an unsafe address. Check local DNS/network setup; do not bypass the restriction |
 | Audio endpoint not HTTP 200 | Expired/invalid challenge or an unsupported response; redirects are intentionally rejected |
-| Connection refused at port 1234 | Start the local vision API and load the configured model |
-| Image model returns malformed JSON | Check model compatibility. Non-object JSON is rejected; no code is executed from responses |
 | Green tick but application rejects form | A token must be associated with the correct widget and validated by the application backend; this demo does not do that integration |
 
 ## Privacy and security
 
-- Audio leaves the machine for Google speech recognition. Image inference defaults
-  to loopback; changing the configured endpoint changes who receives the images.
+- Audio leaves the machine for Google speech recognition.
 - The audio fetcher accepts only `www.google.com` and `www.recaptcha.net`, on HTTPS
   port 443, with `/recaptcha/api2/payload` or `/recaptcha/enterprise/payload`, each
   optionally ending in `/audio.mp3`. Other destinations and redirects are rejected.
@@ -368,14 +275,11 @@ or image-recognition ability.
 - Audio downloads are limited to 10 MiB. Temporary MP3/WAV files are removed on
   normal completion and exceptions. A forced process or machine shutdown can
   still leave temporary files.
-- The demo omits tokens, transcripts and audio URLs from its result. The image
-  experiment saves page screenshots and diagnostics, which can contain sensitive
-  page content. Keep generated output out of Git and delete it when no longer needed.
+- The demo omits tokens, transcripts and audio URLs from its result. Keep any
+  recordings, browser profiles and diagnostics you create out of Git.
 - `.gitignore` does not remove already committed content. Review history and
   author metadata before publication. A public repository remains associated
   with its hosting account.
-- The image experiment still launches Chromium with `--no-sandbox`; this is a
-  remaining hardening limitation. Use only authorized, trusted test pages.
 
 ## Guide for developers and AI coding assistants
 
@@ -390,9 +294,6 @@ claims about reliability. Work from the repository root.
 | Audio URL and network boundary | `_trusted_url`, `_public_addresses`, `_download_audio` | Unsafe URLs, DNS, redirect, pinning and size tests |
 | Recognition deadline | `_transcribe_with_timeout`, `_transcribe_audio_file` | Real sleeping-subprocess timeout test |
 | Widget token retrieval | `get_token`, `_grab_token` | Review multi-widget limitations before integration |
-| Image model prompts/response handling | `LOCATE_PROMPT`, `TILE_PROMPT`, `_parse_json`, `lm_classify_tile` | `tests/test_image_solver.py` |
-| Image geometry/capture | `tile_page_xy`, `process_slot`, `detect_grid` | Image unit tests and local browser fixture |
-| Run persistence | `append_csv`, `save_report`, `run_one` | Inspect output in an isolated directory |
 
 Preserve these invariants:
 
@@ -413,5 +314,5 @@ Preserve these invariants:
    and remaining limits; do not turn a small sample into a universal success claim.
 
 There is no web server, database, hosted API, account system, or deployment step
-in this repository. Both implementations run locally and rely on external browser
-pages; the audio recognizer also relies on an external speech service.
+in this repository. The solver runs locally and relies on external browser
+pages and an external speech-recognition service.

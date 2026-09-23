@@ -7,27 +7,20 @@ success rate or a guarantee about future provider behavior.
 
 - macOS; Python 3.9.6.
 - System Google Chrome; separate temporary browser profiles.
-- DrissionPage 4.1.1.4; Playwright 1.60.0; SpeechRecognition 3.17.0;
-  Pillow 11.3.0; pydub 0.25.1; Requests 2.32.5.
+- DrissionPage 4.1.1.4; SpeechRecognition 3.17.0; pydub 0.25.1.
 - FFmpeg and FFprobe available on PATH.
 - Full dependency version snapshot: `requirements-tested.txt`.
 - System Python emitted urllib3's LibreSSL warning. Tests still ran; this is not
   evidence of compatibility with other Python/TLS installations.
-- No local vision-model service was available, so real image-model inference was
-  not measured.
 
-## Offline and local-browser checks
+## Offline checks
 
 | Check | Result | What it establishes |
 | --- | --- | --- |
-| `python -m unittest discover -s tests -v` | 16 passed | URL/DNS/redirect protections, frame filtering, timeout/cleanup, JSON and image helpers |
+| `python -m unittest discover -s tests -v` | 11 passed | URL/DNS/redirect protections, frame filtering, timeout/cleanup and speech error handling |
 | `python -m pip check` | Passed | Installed dependency metadata consistent |
-| Python syntax compilation | Passed | Both solver modules, demo and test files compile |
+| Python syntax compilation | Passed | Audio solver, demo and test files compile |
 | `git diff --check` | Passed | No whitespace errors in the reviewed diff |
-| `python tests/browser_image_check.py --browser-path <chrome>` | Passed (2 layouts) | All 16 tile clicks and exact 400×400 grid capture, before and after page scrolling |
-
-The browser fixture intercepts every HTTP request and serves locally defined
-HTML. Its model response is mocked. It does not solve an external CAPTCHA.
 
 The recognition deadline test launches a real worker that sleeps for 30 seconds,
 sets a short test deadline, checks that the call returns promptly, and verifies
@@ -86,11 +79,8 @@ in this record.
   reliable on every attempt. The small sample cannot establish a general rate.
 - Headless and headed outcomes must not be combined into a claimed reliability
   estimate without preserving their conditions and failures.
-- Multiple widgets, Enterprise-specific flows, other sites/operating systems,
-  and real vision-model challenge solving were not verified.
+- Multiple widgets, Enterprise-specific flows, and other sites/operating systems
+  were not verified.
 - The native audio destination boundary rejects files/private addresses/proxies/
   redirects. DNS and HTTP-header handling do not have a guaranteed total deadline;
   the hard subprocess deadline covers recognition specifically.
-- Image coordinate and malformed-JSON defects identified during review were
-  corrected and covered by the unit and browser fixture checks.
-- Existing image-script browser hardening limitations are documented in README.

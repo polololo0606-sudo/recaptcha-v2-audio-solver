@@ -6,7 +6,6 @@ __pycache__/
 *.py[cod]
 
 # Generated solver output
-captcha_solver_output/
 *.log
 *.csv
 *.jsonl

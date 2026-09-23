@@ -1,6 +1,3 @@
 DrissionPage
-Pillow
-playwright
 pydub
-requests
 SpeechRecognition
